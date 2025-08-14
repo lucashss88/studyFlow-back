@@ -9,7 +9,7 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: false,
         },
         duracao: {
-            type: DataTypes.INTEGER, // duração em minutos
+            type: DataTypes.INTEGER,
             allowNull: true,
         },
         finalizada: {

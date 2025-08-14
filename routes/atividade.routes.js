@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { Atividade, Disciplina } = require('../models');
 const authenticate = require('../middlewares/authMiddleware');
+const { Op, fn, col} = require('sequelize');
 
 router.use(authenticate);
 
@@ -30,6 +31,72 @@ router.get('/', async (req, res) => {
     } catch (error) {
         console.error('Erro ao buscar atividades:', error);
         res.status(500).json({ error: 'Erro ao buscar atividades' });
+    }
+});
+
+router.get('/recentes', async (req, res) => {
+    try{
+        const seteDiasAtras = new Date();
+        seteDiasAtras.setDate(seteDiasAtras.getDate() - 7);
+
+        const atividadesRecentes = await Atividade.findAll({
+            where: {
+                data: {
+                    [Op.gte]: seteDiasAtras
+                },
+                finalizada: true,
+                usuarioId: req.userId
+            },
+            order: [['data', 'ASC']]
+        });
+        res.json(atividadesRecentes);
+    } catch (e) {
+        console.log(e);
+        res.status(500).send('Erro ao buscar atividades recentes');
+    }
+});
+
+router.get('/por-disciplina', async (req, res) => {
+    const {periodo = 'semana'} = req.query;
+
+    const hoje = new Date();
+    let dataInicio;
+
+    switch (periodo) {
+        case 'dia':
+            dataInicio = new Date(hoje);
+            break;
+        case 'mes':
+            dataInicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+            break;
+        case 'semana':
+        default:
+            dataInicio = new Date();
+            dataInicio.setDate(hoje.getDate() - 6);
+    }
+
+    try {
+        const resultados = await Atividade.findAll({
+            where: {
+                data: {
+                    [Op.gte]: dataInicio,
+                },
+                finalizada:true,
+                usuarioId: req.userId
+            },
+            include: [{model: Disciplina, as: 'disciplina', attributes: ['nome']}],
+            attributes: [
+                [fn('SUM', col('duracao')), 'totalDuracao'],
+                [col('disciplina.Nome'), 'disciplinaNome']
+            ],
+            group: ['disciplina.nome'],
+            raw: true
+        });
+
+        res.json(resultados);
+    } catch (e) {
+        console.log(e);
+        res.status(500).json({erro: 'Erro ao obter dados'});
     }
 });
 
